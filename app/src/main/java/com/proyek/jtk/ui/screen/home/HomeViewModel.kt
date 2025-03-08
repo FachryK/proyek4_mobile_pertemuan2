@@ -1,31 +1,51 @@
 package com.proyek.jtk.ui.screen.home
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.proyek.jtk.data.RewardRepository
-import com.proyek.jtk.model.OrderReward
-import com.proyek.jtk.ui.common.UiState
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.proyek.jtk.model.SchoolStatEntity
+import com.proyek.jtk.repository.SchoolStatRepository
+import com.proyek.jtk.ui.common.UiState
 
-class HomeViewModel(
-    private val repository: RewardRepository
-) : ViewModel() {
-    private val _uiState: MutableStateFlow<UiState<List<OrderReward>>> = MutableStateFlow(UiState.Loading)
-    val uiState: StateFlow<UiState<List<OrderReward>>>
-        get() = _uiState
+class HomeViewModel(private val repository: SchoolStatRepository) : ViewModel() {
 
-    fun getAllRewards() {
+    private val _uiState = MutableStateFlow<UiState<List<SchoolStatEntity>>>(UiState.Loading)
+    val uiState: StateFlow<UiState<List<SchoolStatEntity>>> = _uiState.asStateFlow()
+
+    init {
+        fetchSchoolStats()
+    }
+
+    fun fetchSchoolStats() {
         viewModelScope.launch {
-            repository.getAllRewards()
-                .catch {
-                    _uiState.value = UiState.Error(it.message.toString())
+            flow {
+                val response = repository.getSchoolStats()
+                emit(response?.data ?: emptyList())
+            }
+                .catch { e ->
+                    _uiState.value = UiState.Error(e.localizedMessage ?: "Terjadi kesalahan")
                 }
-                .collect { orderRewards ->
-                    _uiState.value = UiState.Success(orderRewards)
+                .collect { data ->
+                    _uiState.value = if (data.isNotEmpty()) UiState.Success(data)
+                    else UiState.Error("Data kosong")
                 }
         }
+    }
+
+    fun getSchoolStatById(schoolId: String): SchoolStatEntity? {
+        val id = schoolId.toIntOrNull() ?: return null
+        return (uiState.value as? UiState.Success)?.data?.find { it.id == id }
+    }
+}
+
+class HomeViewModelFactory(private val repository: SchoolStatRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return HomeViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

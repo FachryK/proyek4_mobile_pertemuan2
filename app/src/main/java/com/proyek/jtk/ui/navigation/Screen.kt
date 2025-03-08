@@ -1,10 +1,7 @@
 package com.proyek.jtk.ui.navigation
 
 sealed class Screen(val route: String) {
+    object Splash : Screen("splash")
     object Home : Screen("home")
-    object Cart : Screen("cart")
     object Profile : Screen("profile")
-    object DetailReward : Screen("home/{rewardId}") {
-        fun createRoute(rewardId: Long) = "home/$rewardId"
-    }
 }

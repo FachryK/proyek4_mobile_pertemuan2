@@ -4,8 +4,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.proyek.jtk.data.DataDao
-import com.proyek.jtk.data.ProfileEntity
 
 
 @Database(entities = [ProfileEntity::class, DataEntity::class], version = 1, exportSchema = false)
@@ -22,7 +20,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "app_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

@@ -20,6 +20,8 @@ data class DataEntity(
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
+    val nim: String,
     val nama: String,
     val email: String,
+    val photo: String
 )

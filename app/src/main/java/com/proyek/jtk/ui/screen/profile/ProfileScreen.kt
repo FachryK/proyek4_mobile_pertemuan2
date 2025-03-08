@@ -1,7 +1,11 @@
 package com.proyek.jtk.ui.screen.profile
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -12,25 +16,45 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberAsyncImagePainter
 
 @Composable
 fun ProfileScreen(viewModel: ProfileViewModel) {
-    val profileData by viewModel.dataList.observeAsState(emptyList())
+    val profileData by viewModel.dataList.observeAsState(initial = null)
 
     var isEditing by remember { mutableStateOf(false) }
-    var studentName by remember { mutableStateOf(profileData.firstOrNull()?.nama ?: "") }
-    var studentId by remember { mutableStateOf(profileData.firstOrNull()?.id?.toString() ?: "") }
-    var studentEmail by remember { mutableStateOf(profileData.firstOrNull()?.email ?: "") }
-    var profileUploaded by remember { mutableStateOf(false) }
+    var studentName by remember { mutableStateOf("") }
+    var studentNIM by remember { mutableStateOf("") }
+    var studentEmail by remember { mutableStateOf("") }
+    var studentPhoto by remember { mutableStateOf<Uri?>(null) }
 
-    LaunchedEffect(profileData.firstOrNull()) {
-        profileData.firstOrNull()?.let { profile ->
-            studentId = profile.id.toString()
-            studentName = profile.nama
-            studentEmail = profile.email
+    LaunchedEffect(profileData) {
+        profileData?.let { profile ->
+            studentNIM = profile.nim.ifBlank { "" }
+            studentName = profile.nama.ifBlank { "" }
+            studentEmail = profile.email.ifBlank { "" }
+            studentPhoto = profile.photo.takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
+        }
+    }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            studentPhoto = it
+            profileData?.let { profile ->
+                viewModel.upsertProfile(
+                    nama = profile.nama,
+                    nim = profile.nim,
+                    email = profile.email,
+                    photo = it.toString()
+                )
+            }
         }
     }
 
@@ -47,16 +71,33 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
             Box(
                 modifier = Modifier
                     .size(120.dp)
+                    .clip(CircleShape)
                     .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    .background(Color.LightGray, CircleShape),
+                    .background(Color.LightGray, CircleShape)
+                    .clickable(enabled = isEditing) {
+                    if (isEditing) {
+                        imagePickerLauncher.launch("image/*")
+                    }
+                },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = if (profileUploaded) "Uploaded Profile Picture" else "Default Profile Picture",
-                    tint = if (profileUploaded) MaterialTheme.colorScheme.onPrimary else Color.Gray,
-                    modifier = Modifier.size(80.dp)
-                )
+                if (studentPhoto != null) {
+                    androidx.compose.foundation.Image(
+                        painter = rememberAsyncImagePainter(model = studentPhoto),
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Default Profile Picture",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(80.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -64,19 +105,15 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
                 OutlinedTextField(
                     value = studentName,
                     onValueChange = { studentName = it },
-                    label = { Text("Student Name") },
+                    label = { Text("Nama Mahasiswa") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
-                    value = studentId,
-                    onValueChange = { newValue ->
-                        if (newValue.all { it.isDigit() }) {
-                            studentId = newValue
-                        }
-                    },
-                    label = { Text("Student ID") },
+                    value = studentNIM,
+                    onValueChange = { studentNIM = it },
+                    label = { Text("NIM Mahasiswa") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                 )
@@ -85,23 +122,19 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
                 OutlinedTextField(
                     value = studentEmail,
                     onValueChange = { studentEmail = it },
-                    label = { Text("Student Email") },
+                    label = { Text("Email Mahasiswa") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = { profileUploaded = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Upload Photo")
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
                     onClick = {
-                        val studentIdInt = studentId.toIntOrNull() ?: 0
-                        viewModel.upsertProfile(studentIdInt, studentName, studentEmail)
+                        viewModel.upsertProfile(
+                            studentName,
+                            studentNIM,
+                            studentEmail,
+                            studentPhoto?.toString() ?: ""
+                        )
                         isEditing = false
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -110,11 +143,13 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
                 }
 
             } else {
-                Text(text = studentName, style = MaterialTheme.typography.headlineSmall)
+                Text(text = studentName.ifBlank { "Belum Mengisi" }, style = MaterialTheme.typography.headlineSmall)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "ID: $studentId", style = MaterialTheme.typography.bodyLarge)
+
+                Text(text = studentNIM.ifBlank { "Belum Mengisi" }, style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = studentEmail, style = MaterialTheme.typography.bodyLarge)
+
+                Text(text = studentEmail.ifBlank { "Belum Mengisi" }, style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
@@ -127,4 +162,3 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
         }
     }
 }
-

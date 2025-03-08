@@ -28,5 +28,8 @@ interface DataDao {
     suspend fun update(data: ProfileEntity)
 
     @Query("SELECT * FROM profile_table LIMIT 1")
-    fun getProfile(): LiveData<List<ProfileEntity>>
+    fun getProfile(): LiveData<ProfileEntity?>
+
+    @Query("SELECT * FROM profile_table LIMIT 1")
+    suspend fun getProfileSync(): ProfileEntity?
 }

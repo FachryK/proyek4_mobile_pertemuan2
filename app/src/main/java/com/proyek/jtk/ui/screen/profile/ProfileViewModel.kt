@@ -10,16 +10,22 @@ import kotlinx.coroutines.launch
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getDatabase(application).dataDao()
-    val dataList: LiveData<List<ProfileEntity>> = dao.getProfile()
+    val dataList: LiveData<ProfileEntity?> = dao.getProfile()
 
-    fun upsertProfile(id : Int, nama: String, email: String) {
+    fun upsertProfile(nama: String, nim: String, email: String, photo: String) {
         viewModelScope.launch {
-            val currentData = dataList.value?.firstOrNull()
+            val currentData = dao.getProfileSync()
             if (currentData != null) {
-                val updatedProfile = currentData.copy(id = id, nama = nama, email = email)
+                val updatedProfile = ProfileEntity(
+                    id = currentData.id,
+                    nama = nama,
+                    nim = nim,
+                    email = email,
+                    photo = photo
+                )
                 dao.update(updatedProfile)
             } else {
-                dao.insert(ProfileEntity(id = id, nama = nama, email = email))
+                dao.insert(ProfileEntity(nama = nama, nim = nim, email = email, photo = photo))
             }
         }
     }
